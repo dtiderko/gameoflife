@@ -1,0 +1,70 @@
+name: Deploy game to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: determinate-systems/nix-installer-action@v14
+
+      - name: Magic Nix Cache
+        uses: determinate-systems/magic-nix-cache-action@v8
+
+      - name: Build WASM website
+        run: |
+          nix develop --command bash -c "
+            cargo build --profile wasm-release --target wasm32-unknown-unknown
+            wasm-bindgen --no-typescript --target web \
+                --out-dir ./out/ \
+                --out-name 'gameoflife' \
+                ./target/wasm32-unknown-unknown/wasm-release/gameoflife.wasm
+            
+            cat >./out/index.html <<EOL
+            <!doctype html>
+            <html lang="en">
+
+            <head>
+              <style>
+                html,
+                body,
+                canvas {
+                  height: 100% !important;
+                  width: 100% !important;
+                }
+              </style>
+            </head>
+
+            <body style="margin: 0px;">
+              <script type="module">
+                import init from './gameoflife.js'
+
+                init().catch((error) => {
+                  if (!error.message.startsWith("Using exceptions for control flow, don't mind me. This isn't actually an error!")) {
+                    throw error;
+                  }
+                });
+              </script>
+            </body>
+
+            </html>
+            EOL
+          "
+
+      - name: Deploy to Website Branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./out
+          publish_branch: website # The branch where built files will be stored
+          force_orphan: true

@@ -25,7 +25,12 @@
           overlays = [ (import rust-overlay) ];
         };
         craneLib = (crane.mkLib pkgs).overrideToolchain (
-          p: p.rust-bin.nightly.latest.default
+          p: p.rust-bin.nightly.latest.default.override {
+            targets = [
+              "x86_64-unknown-linux-gnu"
+              "wasm32-unknown-unknown"
+            ];
+          }
         );
 
         crate = craneLib.buildPackage {
@@ -47,6 +52,10 @@
         packages.default = crate;
         devShells.default = craneLib.devShell {
           inputsFrom = [ crate ];
+          packages = with pkgs; [
+            wasm-bindgen-cli_0_2_106
+            http-server
+          ];
           LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath (with pkgs;[
             vulkan-loader
             libxkbcommon
